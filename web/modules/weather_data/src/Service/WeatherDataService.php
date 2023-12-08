@@ -134,6 +134,51 @@ class WeatherDataService {
     return array_values($result);
   }
 
+  public function getIconsForObservation($observation) {
+    /* The icon path from the API is of the form:
+    https://api.weather.gov/icons/land/day/skc
+    - OR -
+    https://api.weather.gov/icons/land/day/skc/hurricane
+
+    The last two or three path segments are the ones we need
+    to identify the current conditions. This is because there can be
+    two simultaneous conditions in the legacy icon system.
+
+    For now, we use the _first_ condition given in the path as the canonical
+    condition for the key.
+     */
+    $icon = $observation->icon;
+
+    if ($icon == NULL or strlen($icon) == 0) {
+      return "no data";
+    }
+
+    $url = parse_url($observation->icon);
+    $path = $url["path"];
+    $path = explode("/", $path);
+
+    $path = array_slice($path, 3);
+    $time = $path[0];
+    $path = array_slice($path, 1);
+
+    $images = array_map(function ($piece) {
+      return preg_replace("/,.*$/", "", $piece);
+    }, $path);
+
+    for($i = 0; $i < count($path); $i += 1) {
+      $condition = $time . "/" . $images[$i];
+      $images[$i] = $this->legacyMapping->$condition->icon;
+    }
+
+    for($i = 1; $i < count($images); $i += 1) {
+      if($images[$i] == $images[$i - 1]) {
+        $images = array_splice($images, $i, 1);
+      }
+    }
+
+    return $images;
+  }
+
   /**
    * Gets a unique key identifying the conditions described in an observation.
    *
@@ -415,6 +460,8 @@ class WeatherDataService {
       $daytime = $periodPair[0];
       $overnight = $periodPair[1];
 
+      $icons = $this->getIconsForObservation($daytime);
+
       // Daily forecast cards require the three-letter
       // abrreviated form of the day name.
       $startTime = \DateTimeImmutable::createFromFormat(
@@ -433,7 +480,8 @@ class WeatherDataService {
         'shortDayName' => $shortDayName,
         'startTime' => $daytime->startTime,
         'shortForecast' => $this->t->translate($shortForecast),
-        'icon' => $this->legacyMapping->$obsKey->icon,
+        'icon' => $icons[0],
+        'icon2' => $icons[1],
         'temperature' => $daytime->temperature,
         'probabilityOfPrecipitation' => $daytime->probabilityOfPrecipitation->value,
       ];
