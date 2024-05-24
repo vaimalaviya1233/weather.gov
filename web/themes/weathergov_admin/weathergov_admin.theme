@@ -1,5 +1,6 @@
 <?php
 
+use Drupal\Core\Entity\EntityWithPluginCollectionInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Markup;
 use Drupal\Core\Url;
@@ -17,6 +18,89 @@ function weathergov_admin_form_node_form_alter(
     array &$form,
     FormStateInterface $formState,
 ) {
+    $request = \Drupal::request();
+    $parameters = $request->request->all();
+    if (
+        array_key_exists("action", $parameters) &&
+        $parameters["action"] === "publish"
+    ) {
+        // $preview = \Drupal::service("tempstore.private")
+        //     ->get("node_preview")
+        //     ->get($parameters["uuid"]);
+
+        // $formState->setStorage($preview->getStorage());
+        // $formState->setUserInput($preview->getUserInput());
+
+        // // Rebuild the form.
+        // $formState->setRebuild();
+
+        // $node = $formState->getFormObject()->getEntity();
+        // $node = clone $previous;
+
+        // $values = $formState->getValues();
+
+        // if ($previous instanceof EntityWithPluginCollectionInterface) {
+        //     // Do not manually update values represented by plugin collections.
+        //     $values = array_diff_key(
+        //         $values,
+        //         $previous->getPluginCollections(),
+        //     );
+        // }
+
+        // // @todo This relies on a method that only exists for config and content
+        // //   entities, in a different way. Consider moving this logic to a config
+        // //   entity specific implementation.
+        // foreach ($values as $key => $value) {
+        //     $node->set($key, $value);
+        // }
+
+        // $formInputs = $formState->getUserInput();
+        // $nodeFields = array_keys($node->getFields());
+
+        // $keys = array_keys($formInputs);
+        // $keys = array_filter($keys, fn($key) => in_array($key, $nodeFields));
+
+        // foreach ($keys as $key) {
+        //     $value = $formInputs[$key];
+        //     if ($key === "changed") {
+        //         $value = intval($value);
+        //     }
+        //     $node->set($key, $value);
+        // }
+
+        // $node->set("moderation_state", "published");
+        // $node->save();
+
+        $formState->set("moderation_state", "published");
+        $inputs = $formState->getUserInput();
+        foreach ($inputs as $key => $value) {
+            $formState->setValue($key, $value);
+        }
+        $formState->getFormObject()->submitForm($form, $formState);
+
+        $node = $formState->getFormObject()->getEntity();
+
+        // To make a nice message, we can use the entity type's label and the title
+        // of the node revision that we're unpublishing.
+        $type = $node->type->entity->label();
+        $title = $node->get("title")->value;
+
+        // We'll also insert a link to the current revision of the node. For that,
+        // we need the node ID.
+        $nodeID = $node->id();
+        $url = Url::fromUri("base:node/$nodeID");
+        $url = $url->toString();
+
+        // Add the pretty message.
+        \Drupal::service("messenger")->addMessage(
+            Markup::create("Published $type <a href=\"$url\">$title</a>"),
+        );
+
+        $node->set("moderation_state", "published");
+        $valid = $node->validate();
+        $node->save();
+    }
+
     // These are the button values we want for new content. If this is a
     // revision, we'll change the button values below.
     $form["actions"]["submit"]["#value"] = "Save as draft";

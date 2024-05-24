@@ -49,8 +49,25 @@
       {{ 'Skip to main content'|t }}
     </a>
 
+    {% set nodeID = page_top.node_preview.view_mode.backlink["#url"].routeParameters.node %}
+    {% set previewUUID = page_top.node_preview.view_mode.backlink["#options"].query.uuid %}
+
+    {# This is quirky because the full link URL isn't built until this element
+        gets rendered. So we render it once in a comment so we can then access
+        the correct URL. #}
+    <!-- {{page_top.node_preview.view_mode.backlink}} -->
+    {% set editURL = page_top.node_preview.view_mode.backlink["#url"] | render %}
+    {% set publishURL = editURL | split("?") | slice(0, -1) | join %}
+
     <div class="padding-3 border-bottom">
-      {{_context.page_top.node_preview.view_mode.backlink}}
+      <form method="POST" action="{{ publishURL }}" enctype="multipart/form-data" style="display: inline;">
+        <input type="hidden" name="action" value="publish">
+        <input type="hidden" name="node" value="{{ nodeID }}">
+        <input type="hidden" name="uuid" value="{{ previewUUID }}">
+        <input type="submit" class="usa-button" value="Publish"></input>
+      </form>
+
+      <a href="{{ editURL }}" class="usa-button">Return to edit</a>
     </div>
 
     <div class="margin-top-3">
